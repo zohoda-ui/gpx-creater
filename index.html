@@ -204,7 +204,55 @@
                 padding: 10px;
             }
         }
+
+        /* Map Overlay Styling */
+        #map-overlay {
+            position: absolute;
+            top: 20px;
+            right: 60px; /* Leaflet 줌 버튼(topright)을 피하기 위한 여백 */
+            z-index: 1000;
+            background: rgba(24, 24, 27, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        #map-overlay .control-group {
+            margin-bottom: 0;
+        }
+
+        #map-overlay .control-label {
+            font-size: 0.75rem;
+        }
+
+        @media (max-width: 768px) {
+            #map-overlay {
+                top: 10px;
+                right: 10px;
+                padding: 10px;
+                gap: 10px;
+                left: 10px; /* 모바일에서는 양쪽 여백 */
+                flex-direction: row; /* 모바일에서는 가로 배치 */
+                justify-content: space-between;
+            }
+            #map-overlay .radio-label {
+                font-size: 0.8rem;
+            }
+            /* Leaflet zoom control hiding on mobile to prevent overlap */
+            .leaflet-control-zoom {
+                display: none;
+            }
+        }
     </style>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -222,35 +270,10 @@
             </div>
         </div>
 
-        <div class="control-group">
-            <span class="control-label">MAP TYPE</span>
-            <div class="radio-group">
-                <label class="radio-label">
-                    <input type="radio" name="mapType" value="osm" checked onchange="changeMapType(this.value)">
-                    등산/일반 지도 (OSM)
-                </label>
-                <label class="radio-label">
-                    <input type="radio" name="mapType" value="base" onchange="changeMapType(this.value)">
-                    일반 지도 (Vworld)
-                </label>
-                <label class="radio-label">
-                    <input type="radio" name="mapType" value="satellite" onchange="changeMapType(this.value)">
-                    위성 지도 (Vworld)
-                </label>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <span class="control-label">ROUTING MODE</span>
-            <div class="radio-group">
-                <label class="radio-label">
-                    <input type="radio" name="routingMode" value="routing" checked onchange="changeRoutingMode(this.value)">
-                    경로 탐색 (자동 길찾기) (기본값)
-                </label>
-                <label class="radio-label">
-                    <input type="radio" name="routingMode" value="straight" onchange="changeRoutingMode(this.value)">
-                    직선 연결 (오프로드)
-                </label>
+        <div class="control-group" style="flex-grow: 1; display: flex; flex-direction: column; min-height: 200px;">
+            <span class="control-label">ELEVATION PROFILE</span>
+            <div style="flex-grow: 1; position: relative;">
+                <canvas id="elevationChart"></canvas>
             </div>
         </div>
 
@@ -271,7 +294,43 @@
         <button class="btn-primary" onclick="downloadGPX()">Download GPX File</button>
     </div>
 
-    <div id="map"></div>
+    <div style="position: relative; flex-grow: 1; height: 100%; display: flex;">
+        <div id="map" style="width: 100%; height: 100%;"></div>
+        
+        <div id="map-overlay">
+            <div class="control-group">
+                <span class="control-label">MAP TYPE</span>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="mapType" value="osm" checked onchange="changeMapType(this.value)">
+                        등산/일반 (OSM)
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="mapType" value="base" onchange="changeMapType(this.value)">
+                        일반 (Vworld)
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="mapType" value="satellite" onchange="changeMapType(this.value)">
+                        위성 (Vworld)
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <span class="control-label">ROUTING MODE</span>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="routingMode" value="routing" checked onchange="changeRoutingMode(this.value)">
+                        경로 탐색 (자동 길찾기)
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="routingMode" value="straight" onchange="changeRoutingMode(this.value)">
+                        직선 연결 (오프로드)
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -395,7 +454,9 @@
                         }
                         for (let j = startIdx; j < segment.length; j++) {
                             allCoords.push(segment[j]);
-                            allEles.push(eles[j]);
+                            // 다운로드 버그 방지: 고도값이 undefined일 경우 0으로 강제 처리
+                            const ele = (eles && eles[j] !== undefined) ? eles[j] : 0;
+                            allEles.push(ele);
                         }
                     }
                 }
@@ -420,6 +481,65 @@
             return gain;
         }
 
+        // Chart.js instance
+        let elevationChart = null;
+
+        function updateChart(coords, elevations) {
+            const ctx = document.getElementById('elevationChart').getContext('2d');
+            
+            // X축 데이터를 누적 거리로 변환
+            let distances = [0];
+            let currentDist = 0;
+            for (let i = 1; i < coords.length; i++) {
+                currentDist += haversine(coords[i-1][0], coords[i-1][1], coords[i][0], coords[i][1]);
+                distances.push(currentDist.toFixed(2));
+            }
+
+            if (elevationChart) {
+                elevationChart.destroy();
+            }
+
+            elevationChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: distances,
+                    datasets: [{
+                        label: 'Elevation (m)',
+                        data: elevations,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) { return context[0].label + ' km'; },
+                                label: function(context) { return context.raw.toFixed(0) + ' m'; }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { maxTicksLimit: 5, color: '#a1a1aa' },
+                            grid: { color: '#3f3f46' }
+                        },
+                        y: { 
+                            ticks: { color: '#a1a1aa' },
+                            grid: { color: '#3f3f46' }
+                        }
+                    }
+                }
+            });
+        }
+
         function updateUI() {
             const combined = getCombinedData();
             const allCoords = combined.coords;
@@ -436,6 +556,9 @@
                 const gain = calculateElevationGain(allEles);
                 document.getElementById('elevation-display').innerText = Math.round(gain);
             }
+
+            // Update chart
+            updateChart(allCoords, allEles);
 
             // Update polyline
             polyline.setLatLngs(allCoords);
