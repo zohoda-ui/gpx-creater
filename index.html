@@ -437,8 +437,8 @@
             ※ GPS 환경에 따라 실제 거리 및 고도 데이터는 차이가 발생할 수 있습니다.
         </div>
 
-        <span class="chart-label">ELEVATION PROFILE</span>
-        <div class="chart-container">
+        <span class="chart-label" id="chart-label" style="display: none;">ELEVATION PROFILE</span>
+        <div class="chart-container" id="chart-container" style="display: none;">
             <canvas id="elevationChart"></canvas>
         </div>
 
@@ -450,6 +450,10 @@
             <!-- Download -->
             <div class="action-btn" onclick="downloadGPX()">
                 <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            </div>
+            <!-- Toggle Graph -->
+            <div class="action-btn" onclick="toggleElevationGraph()">
+                <svg viewBox="0 0 24 24"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg>
             </div>
             <!-- Undo -->
             <div class="action-btn" onclick="undoLastPoint()">
@@ -526,6 +530,18 @@
                 fab.style.display = 'none';
             } else {
                 fab.style.display = 'flex';
+            }
+        }
+
+        function toggleElevationGraph() {
+            const chartLabel = document.getElementById('chart-label');
+            const chartContainer = document.getElementById('chart-container');
+            if (chartContainer.style.display === 'none') {
+                chartContainer.style.display = 'block';
+                chartLabel.style.display = 'block';
+            } else {
+                chartContainer.style.display = 'none';
+                chartLabel.style.display = 'none';
             }
         }
 
