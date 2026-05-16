@@ -933,11 +933,19 @@
                 return;
             }
 
+            let filename = prompt("저장할 파일명을 입력하세요:", "my_custom_route");
+            if (filename === null || filename.trim() === "") {
+                return; // User cancelled or entered empty name
+            }
+            if (!filename.toLowerCase().endsWith('.gpx')) {
+                filename += '.gpx';
+            }
+
             const allEles = smoothElevations(rawEles);
 
             let gpxStr = `<?xml version="1.0" encoding="UTF-8"?>\n`;
             gpxStr += `<gpx version="1.1" creator="HTML GPX Creator" xmlns="http://www.topografix.com/GPX/1/1">\n`;
-            gpxStr += `  <trk>\n    <name>My Custom Route</name>\n    <trkseg>\n`;
+            gpxStr += `  <trk>\n    <name>${filename.replace('.gpx', '')}</name>\n    <trkseg>\n`;
 
             allCoords.forEach((coord, i) => {
                 gpxStr += `      <trkpt lat="${coord[0]}" lon="${coord[1]}">\n`;
@@ -952,7 +960,7 @@
             
             const a = document.createElement("a");
             a.href = url;
-            a.download = "my_custom_route.gpx";
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
