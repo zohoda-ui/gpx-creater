@@ -760,16 +760,20 @@
                     let sampledElevations = data.results.map(r => r.elevation);
                     let finalElevations = new Array(coords.length).fill(0);
                     
-                    for (let i = 0; i < sampleIndices.length - 1; i++) {
-                        let idxA = sampleIndices[i];
-                        let idxB = sampleIndices[i+1];
-                        let eleA = sampledElevations[i];
-                        let eleB = sampledElevations[i+1];
-                        finalElevations[idxA] = eleA;
-                        finalElevations[idxB] = eleB;
-                        let steps = idxB - idxA;
-                        for (let j = 1; j < steps; j++) {
-                            finalElevations[idxA + j] = eleA + (eleB - eleA) * (j / steps);
+                    if (sampleIndices.length === 1) {
+                        finalElevations[0] = sampledElevations[0];
+                    } else {
+                        for (let i = 0; i < sampleIndices.length - 1; i++) {
+                            let idxA = sampleIndices[i];
+                            let idxB = sampleIndices[i+1];
+                            let eleA = sampledElevations[i];
+                            let eleB = sampledElevations[i+1];
+                            finalElevations[idxA] = eleA;
+                            finalElevations[idxB] = eleB;
+                            let steps = idxB - idxA;
+                            for (let j = 1; j < steps; j++) {
+                                finalElevations[idxA + j] = eleA + (eleB - eleA) * (j / steps);
+                            }
                         }
                     }
                     return finalElevations;
